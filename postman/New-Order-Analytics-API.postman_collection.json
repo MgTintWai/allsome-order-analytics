@@ -1,0 +1,55 @@
+{
+	"info": {
+		"_postman_id": "8f3a2c1e-0b4d-4a9e-8c7f-1a2b3c4d5e6f",
+		"name": "New Order Analytics API",
+		"description": "Laravel service: upload an orders **.csv** and receive total revenue and best-selling SKU (JSON).\n\n**Setup:** Import `Local.postman_environment.json`, select the **Local** environment, and run `php artisan serve` (default `http://127.0.0.1:8000`).\n\n**File type:** The API enforces a single **.csv** (extension + allowed CSV MIME, max 4 MB). **One file row** for key `csv` in form-data; do not attach a second file to the same key. Large files may hit `post_max_size` first (413).\n\nFor **Orders — Analytics**, use `tests/Fixtures/allsome_interview_test_orders.csv` or any file named `.csv` with header `order_id,sku,quantity,price`.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": "{{baseUrl}}/api/health"
+			},
+			"response": []
+		},
+		{
+			"name": "Orders — Analytics (upload CSV)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "csv",
+							"description": "Exactly one **.csv** file (max 4 MB). No second file for the same `csv` key. First line: `order_id,sku,quantity,price`. Sample: `tests/Fixtures/allsome_interview_test_orders.csv`.",
+							"type": "file",
+							"src": []
+						}
+					]
+				},
+				"url": "{{baseUrl}}/api/orders/analytics"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://127.0.0.1:8000"
+		}
+	]
+}
