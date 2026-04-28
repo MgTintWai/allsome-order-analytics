@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Contracts;
 
+use App\DTO\OrderCsvLoadResult;
 use App\Exceptions\OrderCsvFileException;
 
 /**
@@ -11,12 +14,10 @@ use App\Exceptions\OrderCsvFileException;
 interface OrderCsvRepositoryInterface
 {
     /**
-     * @return array{
-     *     lines: list<array{order_id: int, sku: string, quantity: int, price: float}>,
-     *     row_errors: list<array{line: int, message: string}>
-     * }
+     * Read and parse the file at the given path. Malformed data rows are collected in
+     * {@see OrderCsvLoadResult::rowErrors}; only transport-level failures use exceptions.
      *
-     * @throws OrderCsvFileException When the file is missing, not readable, or not a file.
+     * @throws OrderCsvFileException When the path is not a readable file, or cannot be read.
      */
-    public function loadFromFile(string $absolutePath): array;
+    public function loadFromFile(string $absolutePath): OrderCsvLoadResult;
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Validation\Rules;
 
 use App\Support\OrderUploadConstraints;
@@ -8,8 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 
 /**
- * One valid CSV upload: single part in the field, .csv on disk name + guessed type, declared
- * MIME in allow-list, and size cap. (See README: how duplicate Postman files are caught.)
+ * Ensures a single part in the field: valid upload, under max size, `.csv` by client and guessed
+ * extension, and declared MIME in the allow list. Duplicates in Postman are also rejected when PHP
+ * exposes an array of uploads. See also {@see OrderCsvRequestBodyHeuristic} for the one-visible-file case.
  */
 final class OrderCsvFile implements ValidationRule
 {
@@ -17,63 +20,69 @@ final class OrderCsvFile implements ValidationRule
         private readonly Request $request
     ) {}
 
+    /**
+     * @param  \Closure(string): void  $fail
+     */
     public function validate(string $attribute, mixed $value, \Closure $fail): void
     {
-        $file = $this->unwrapExactlyOne($attribute, $this->request->file($attribute), $fail);
-        if (! $file instanceof UploadedFile) {
+        $uploaded = $this->unwrapSingleUploadedFile($attribute, $this->request->file($attribute), $fail);
+        if (! $uploaded instanceof UploadedFile) {
             return;
         }
 
-        if (! $file->isValid()) {
+        if (! $uploaded->isValid()) {
             $fail('The upload is invalid or failed on the server.');
 
             return;
         }
 
-        if ($this->isOverSize($file)) {
+        if ($this->isExceedingMaxSize($uploaded)) {
             $fail('The CSV file may not be larger than '.OrderUploadConstraints::maxUploadSizeMegabytes().' MB.');
 
             return;
         }
 
-        if (! $this->hasAllowedCsvExtension($file)) {
+        if (! $this->hasAllowedCsvExtension($uploaded)) {
             $fail('Only a file with the .csv extension is allowed. Renamed PDF, image, or text files are not accepted.');
 
             return;
         }
 
-        if (! $this->hasAllowedCsvMimeType($file)) {
+        if (! $this->hasAllowedCsvMimeType($uploaded)) {
             $fail('The file does not look like a CSV (MIME type is not an allowed CSV type).');
 
             return;
         }
     }
 
-    private function isOverSize(UploadedFile $file): bool
+    private function isExceedingMaxSize(UploadedFile $file): bool
     {
         return $file->getSize() > OrderUploadConstraints::MAX_UPLOAD_BYTES;
     }
 
     private function hasAllowedCsvExtension(UploadedFile $file): bool
     {
-        $ext = strtolower((string) $file->getClientOriginalExtension());
-        $inferred = strtolower((string) $file->guessExtension());
+        $clientExtension = strtolower((string) $file->getClientOriginalExtension());
+        $inferredExtension = strtolower((string) $file->guessExtension());
 
-        if ($ext !== OrderUploadConstraints::EXPECTED_CSV_FILE_EXTENSION) {
+        if ($clientExtension !== OrderUploadConstraints::EXPECTED_CSV_FILE_EXTENSION) {
             return false;
         }
 
-        return $inferred === OrderUploadConstraints::EXPECTED_CSV_FILE_EXTENSION;
+        return $inferredExtension === OrderUploadConstraints::EXPECTED_CSV_FILE_EXTENSION;
     }
 
     private function hasAllowedCsvMimeType(UploadedFile $file): bool
     {
-        $mime = strtolower((string) $file->getMimeType());
+        $declaredMime = strtolower((string) $file->getMimeType());
 
-        return in_array($mime, OrderUploadConstraints::CSV_ALLOWED_MIMES, true);
+        return in_array($declaredMime, OrderUploadConstraints::CSV_ALLOWED_MIMES, true);
     }
 
-    private function unwrapExactlyOne(string $attribute, mixed $files, \Closure $fail): ?UploadedFile
+    /**
+     * @param  \Closure(string): void  $fail
+     */
+    private function unwrapSingleUploadedFile(string $attribute, mixed $files, \Closure $fail): ?UploadedFile
     {
         if ($files === null) {
             $fail('A CSV file is required in the "'.$attribute.'" field.');

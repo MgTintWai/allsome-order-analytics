@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Requests;
 
 use App\Http\Responses\ApiErrorResponse;
@@ -12,15 +14,16 @@ use Illuminate\Http\UploadedFile;
 
 class OrderAnalyticsUploadRequest extends FormRequest
 {
+    /**
+     * Public upload endpoint: no auth required for the assessment use case.
+     */
     public function authorize(): bool
     {
         return true;
     }
 
     /**
-     * @see theCsvFile() for the resolved {@see \Illuminate\Http\UploadedFile} passed to the controller.
-     * @see \App\Validation\Rules\OrderCsvFile
-     * @see \App\Validation\Rules\OrderCsvRequestBodyHeuristic
+     * @return array<string, list<int|string|OrderCsvFile|OrderCsvRequestBodyHeuristic>>
      */
     public function rules(): array
     {
@@ -35,18 +38,21 @@ class OrderAnalyticsUploadRequest extends FormRequest
     }
 
     /**
-     * Single uploaded file to analyze (the only part when the client did not turn `csv` into a list).
+     * Single uploaded part for `csv` (the first part when the client sent an array; validation rejects multiple).
      */
     public function theCsvFile(): UploadedFile
     {
-        $f = $this->file('csv');
-        if (is_array($f)) {
-            $f = $f[0];
+        $fileOrList = $this->file('csv');
+        if (is_array($fileOrList)) {
+            $fileOrList = $fileOrList[0];
         }
 
-        return $f;
+        return $fileOrList;
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function messages(): array
     {
         return [
@@ -54,6 +60,9 @@ class OrderAnalyticsUploadRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function attributes(): array
     {
         return [
@@ -62,8 +71,9 @@ class OrderAnalyticsUploadRequest extends FormRequest
     }
 
     /**
-     * Return the standard error envelope (same shape as other API errors) when rules fail.
-     * Note: 413 (post too large) is still handled before validation when PHP’s limit is lower.
+     * Return the same JSON `error` envelope as other API errors when input validation fails.
+     *
+     * @throws HttpResponseException
      */
     protected function failedValidation(Validator $validator)
     {

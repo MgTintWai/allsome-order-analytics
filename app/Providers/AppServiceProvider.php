@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Contracts\CsvFileReaderInterface;
 use App\Contracts\OrderCsvRepositoryInterface;
+use App\Infrastructure\CsvFileReader;
 use App\Repositories\OrderCsvRepository;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -14,6 +16,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(CsvFileReaderInterface::class, CsvFileReader::class);
         $this->app->bind(OrderCsvRepositoryInterface::class, OrderCsvRepository::class);
     }
 

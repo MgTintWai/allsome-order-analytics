@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Support;
 
 /**
- * Product limits and tuning values for order-CSV upload + analytics.
+ * Product limits and tuning for order-CSV upload and JSON output (revenue decimal places, etc.).
  */
 final class OrderUploadConstraints
 {
@@ -38,11 +40,30 @@ final class OrderUploadConstraints
 
     public const MULTIPART_BODY_SIZE_RATIO = 0.02;
 
+    /**
+     * User-facing app limit, derived from {@see self::MAX_UPLOAD_KILOBYTES} (e.g. 4 MB for 4096 KiB).
+     */
     public static function maxUploadSizeMegabytes(): int
     {
         return (int) (self::MAX_UPLOAD_KILOBYTES / self::KILOBYTE);
     }
 
+    /**
+     * Format total revenue for JSON with exactly two fractional digits (e.g. "710.00").
+     * Encoding a float with json_encode often drops trailing zeros (710), unlike brief examples (610.00).
+     *
+     * @return non-empty-string
+     */
+    public static function formatTotalRevenueForJson(float $totalRevenue): string
+    {
+        return number_format($totalRevenue, self::JSON_REVENUE_DECIMALS, '.', '');
+    }
+
+    /**
+     * Slack for multipart boundary fields when comparing the visible upload size to `Content-Length`.
+     *
+     * @param  int  $visibleFileSizeBytes  Size of the single {@see \Illuminate\Http\UploadedFile} PHP kept.
+     */
     public static function multipartToleranceForVisibleFile(int $visibleFileSizeBytes): int
     {
         return max(

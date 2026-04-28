@@ -1,11 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Contracts\OrderCsvRepositoryInterface;
-use App\Support\OrderUploadConstraints;
+use App\DTO\CsvRowError;
+use App\DTO\OrderLine;
 use App\Exceptions\NoValidOrderRowsInCsvException;
 use App\Exceptions\OrderCsvFileException;
+use App\Support\OrderUploadConstraints;
+use InvalidArgumentException;
 
 class OrderAnalyticsService
 {
@@ -14,77 +19,105 @@ class OrderAnalyticsService
     ) {}
 
     /**
-     * End-to-end: load order lines from a CSV on disk, then compute analytics.
-     * Repository = data access (file CSV here, same role as a DB-backed repository in other services).
+     * Load order lines from a CSV on disk, then compute revenue and best-selling SKU.
+     * The repository models data access; analytics stay in this service.
      *
-     * @throws OrderCsvFileException
-     * @throws NoValidOrderRowsInCsvException
-     * @return array{total_revenue: float, best_selling_sku: array{sku: string, total_quantity: int}, warnings?: list<array{line: int, message: string}>}
+     * @return array{
+     *     total_revenue: string,
+     *     best_selling_sku: array{sku: string, total_quantity: int},
+     *     warnings?: list<array{line: int, message: string}>
+     * }
+     *
+     * @throws OrderCsvFileException When the file cannot be read.
+     * @throws NoValidOrderRowsInCsvException When the CSV has no valid order rows to aggregate.
      */
     public function analyzeFromCsvPath(string $absolutePath): array
     {
-        $load = $this->orderCsvRepository->loadFromFile($absolutePath);
-        if ($load['lines'] === []) {
-            throw new NoValidOrderRowsInCsvException($load['row_errors']);
+        $csvLoad = $this->orderCsvRepository->loadFromFile($absolutePath);
+        if ($csvLoad->orderLines === []) {
+            throw new NoValidOrderRowsInCsvException(
+                $this->rowErrorPayloads($csvLoad->rowErrors)
+            );
         }
 
-        $summary = $this->summarize($load['lines']);
-        if ($load['row_errors'] !== []) {
-            $summary['warnings'] = $load['row_errors'];
+        $analytics = $this->summarize($csvLoad->orderLines);
+        if ($csvLoad->rowErrors !== []) {
+            $analytics['warnings'] = $this->rowErrorPayloads($csvLoad->rowErrors);
         }
 
-        return $summary;
+        return $analytics;
     }
 
     /**
-     * @param  list<array{order_id: int, sku: string, quantity: int, price: float}>  $lines
-     * @return array{total_revenue: float, best_selling_sku: array{sku: string, total_quantity: int}}
+     * Aggregate pre-validated order lines into total revenue and best-selling SKU (by total quantity).
+     *
+     * @param  list<OrderLine>  $orderLines
+     * @return array{total_revenue: string, best_selling_sku: array{sku: string, total_quantity: int}}
+     *
+     * @throws InvalidArgumentException If {@see $orderLines} is empty.
      */
-    public function summarize(array $lines): array
+    public function summarize(array $orderLines): array
     {
-        if ($lines === []) {
-            throw new \InvalidArgumentException('No order lines to summarize');
+        if ($orderLines === []) {
+            throw new InvalidArgumentException('No order lines to summarize.');
         }
 
         $totalRevenue = 0.0;
-        $quantitiesBySku = [];
+        /** @var array<string, int> $quantityBySku */
+        $quantityBySku = [];
 
-        foreach ($lines as $line) {
-            $totalRevenue += $line['quantity'] * $line['price'];
-            $key = $line['sku'];
-            $quantitiesBySku[$key] = ($quantitiesBySku[$key] ?? 0) + $line['quantity'];
+        foreach ($orderLines as $orderLine) {
+            $totalRevenue += $orderLine->quantity * $orderLine->price;
+            $skuKey = $orderLine->sku;
+            $quantityBySku[$skuKey] = ($quantityBySku[$skuKey] ?? 0) + $orderLine->quantity;
         }
 
-        $best = $this->bestSellingSku($quantitiesBySku);
+        $bestSku = $this->resolveBestSellingSku($quantityBySku);
 
         return [
-            'total_revenue' => round($totalRevenue, OrderUploadConstraints::JSON_REVENUE_DECIMALS),
+            'total_revenue' => OrderUploadConstraints::formatTotalRevenueForJson($totalRevenue),
             'best_selling_sku' => [
-                'sku' => $best['sku'],
-                'total_quantity' => $best['total_quantity'],
+                'sku' => $bestSku['sku'],
+                'total_quantity' => $bestSku['total_quantity'],
             ],
         ];
     }
 
     /**
-     * @param  array<string, int>  $quantitiesBySku
-     * @return array{sku: string, total_quantity: int}
+     * @param  list<CsvRowError>  $rowErrors
+     * @return list<array{line: int, message: string}>
      */
-    private function bestSellingSku(array $quantitiesBySku): array
+    private function rowErrorPayloads(array $rowErrors): array
     {
-        if ($quantitiesBySku === []) {
-            throw new \InvalidArgumentException('No SKU quantities to compare');
+        return array_map(
+            static fn (CsvRowError $rowError): array => $rowError->toArray(),
+            $rowErrors
+        );
+    }
+
+    /**
+     * Picks the SKU with the largest total quantity; on a tie, the lexicographically smallest SKU.
+     *
+     * @param  array<string, int>  $quantityBySku
+     * @return array{sku: string, total_quantity: int}
+     *
+     * @throws InvalidArgumentException If {@see $quantityBySku} is empty.
+     */
+    private function resolveBestSellingSku(array $quantityBySku): array
+    {
+        if ($quantityBySku === []) {
+            throw new InvalidArgumentException('No SKU quantities to compare.');
         }
 
-        arsort($quantitiesBySku, SORT_NUMERIC);
-        $maxQuantity = (int) reset($quantitiesBySku);
-        $candidates = array_keys(array_filter(
-            $quantitiesBySku,
-            static fn (int $q) => $q === $maxQuantity
+        arsort($quantityBySku, SORT_NUMERIC);
+        $highestTotalQuantity = (int) reset($quantityBySku);
+        $tiedSkus = array_keys(array_filter(
+            $quantityBySku,
+            static fn (int $totalQuantity): bool => $totalQuantity === $highestTotalQuantity
         ));
-        sort($candidates, SORT_STRING);
-        $sku = (string) $candidates[0];
+        sort($tiedSkus, SORT_STRING);
+        $winningSku = (string) $tiedSkus[0];
 
-        return ['sku' => $sku, 'total_quantity' => $maxQuantity];
+        return ['sku' => $winningSku, 'total_quantity' => $highestTotalQuantity];
     }
 }

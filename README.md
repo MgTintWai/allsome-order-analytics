@@ -60,13 +60,15 @@ curl -s -F "csv=@tests/Fixtures/allsome_interview_test_orders.csv" \
 
 ```json
 {
-  "total_revenue": 710,
+  "total_revenue": 710.00,
   "best_selling_sku": {
     "sku": "SKU-A123",
     "total_quantity": 5
   }
 }
 ```
+
+`total_revenue` is a **JSON number** with two fractional digits (like the brief’s `610.00`), not a quoted string. PHP’s default `json_encode(float)` omits `.00` for whole values, so the app builds that field with a small JSON fragment (see `OrderAnalyticsSuccessResponse`).
 
 **Tie-break:** If two SKUs have the same total quantity, the **lowest** SKU name (string sort) is returned so the result is stable.
 
@@ -129,9 +131,16 @@ composer test
 
 - `app/Contracts/BaseInterface.php` — base repository contract (shared pattern)
 - `app/Repositories/BaseRepository.php` — Eloquent `BaseInterface` implementation
-- `app/Contracts/OrderCsvRepositoryInterface.php` — CSV loading contract
-- `app/Repositories/OrderCsvRepository.php` — parsing + row validation
+- `app/Contracts/OrderCsvRepositoryInterface.php` — CSV loading contract (path → load result)
+- `app/Contracts/CsvFileReaderInterface.php` — read file lines only
+- `app/Infrastructure/CsvFileReader.php` — disk I/O for CSV path
+- `app/Services/OrderCsvParser.php` — `str_getcsv` per line (no domain rules)
+- `app/Services/OrderHeaderValidator.php` — expected header row
+- `app/Services/OrderRowValidator.php` — per-row order field rules
+- `app/Services/OrderImportService.php` — orchestrates import → `OrderCsvLoadResult`
+- `app/Repositories/OrderCsvRepository.php` — thin adapter to `OrderImportService`
 - `app/Services/OrderAnalyticsService.php` — calls repository, revenue + best SKU
+- `app/DTO/` — `OrderLine`, `CsvRowError`, `OrderCsvLoadResult` (data transfer for CSV → analytics)
 - `app/Http/Controllers/Api/OrderAnalyticsController.php` — upload endpoint
 - `app/Http/Requests/OrderAnalyticsUploadRequest.php` — composes `OrderCsvFile` + `OrderCsvRequestBodyHeuristic`, `failedValidation` envelope
 - `app/Support/OrderUploadConstraints.php` — max upload size, CSV column count, JSON decimals, `Content-Length` tolerance helper
@@ -139,6 +148,7 @@ composer test
 - `app/Validation/Rules/OrderCsvRequestBodyHeuristic.php` — duplicate hidden attachments (HTTP size vs visible file)
 - `app/Exceptions/Handler.php` — 413, validation, domain errors (JSON)
 - `app/Http/Responses/ApiErrorResponse.php` — `error` envelope
+- `app/Http/Responses/OrderAnalyticsSuccessResponse.php` — 200 body with `total_revenue` as a JSON number showing `.00`
 - `tests/Fixtures/allsome_interview_test_orders.csv` — sample data
 - `example-output.json` — sample output for the sample CSV
 

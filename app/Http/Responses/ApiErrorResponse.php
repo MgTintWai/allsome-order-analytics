@@ -6,10 +6,13 @@ namespace App\Http\Responses;
 
 use Illuminate\Http\JsonResponse;
 
+/**
+ * Consistent `{"error": {"type", "message", "details?"} }` body for API failures.
+ */
 final class ApiErrorResponse
 {
     /**
-     * @param  array<string, mixed>|null  $details
+     * @param  array<string, mixed>|null  $details  Field-level or structured problems (e.g. validation `errors`).
      */
     public static function make(
         string $type,
