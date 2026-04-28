@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\DTO\CsvRowError;
+use App\DTO\CsvRowIssue;
 
 /**
  * Validates the first row of the orders CSV: expected column names, BOM/whitespace, lowercase.
@@ -16,7 +16,7 @@ final class OrderHeaderValidator
     /**
      * @param  list<string|null>  $headerCells  First data row after `str_getcsv` of line 1.
      */
-    public function validateHeaderOrError(array $headerCells): ?CsvRowError
+    public function validateHeaderOrIssue(array $headerCells): ?CsvRowIssue
     {
         $headerLine = array_map(
             function ($cell): string {
@@ -26,12 +26,12 @@ final class OrderHeaderValidator
         );
 
         if (count($headerLine) < count(self::EXPECTED_HEADERS)) {
-            return new CsvRowError(1, 'Invalid header row: expected order_id, sku, quantity, price');
+            return new CsvRowIssue(1, 'Invalid header row: expected order_id, sku, quantity, price');
         }
 
         foreach (self::EXPECTED_HEADERS as $index => $expectedHeader) {
             if (($headerLine[$index] ?? '') !== $expectedHeader) {
-                return new CsvRowError(1, 'Invalid header row: expected order_id, sku, quantity, price');
+                return new CsvRowIssue(1, 'Invalid header row: expected order_id, sku, quantity, price');
             }
         }
 

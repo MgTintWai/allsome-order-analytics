@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\OrderCsvRepositoryInterface;
-use App\DTO\CsvRowError;
+use App\DTO\CsvRowIssue;
 use App\DTO\OrderLine;
 use App\Exceptions\NoValidOrderRowsInCsvException;
 use App\Exceptions\OrderCsvFileException;
@@ -36,13 +36,13 @@ class OrderAnalyticsService
         $csvLoad = $this->orderCsvRepository->loadFromFile($absolutePath);
         if ($csvLoad->orderLines === []) {
             throw new NoValidOrderRowsInCsvException(
-                $this->rowErrorPayloads($csvLoad->rowErrors)
+                $this->rowIssuePayloads($csvLoad->rowIssues)
             );
         }
 
         $analytics = $this->summarize($csvLoad->orderLines);
-        if ($csvLoad->rowErrors !== []) {
-            $analytics['warnings'] = $this->rowErrorPayloads($csvLoad->rowErrors);
+        if ($csvLoad->rowIssues !== []) {
+            $analytics['warnings'] = $this->rowIssuePayloads($csvLoad->rowIssues);
         }
 
         return $analytics;
@@ -84,14 +84,14 @@ class OrderAnalyticsService
     }
 
     /**
-     * @param  list<CsvRowError>  $rowErrors
+     * @param  list<CsvRowIssue>  $rowIssues
      * @return list<array{line: int, message: string}>
      */
-    private function rowErrorPayloads(array $rowErrors): array
+    private function rowIssuePayloads(array $rowIssues): array
     {
         return array_map(
-            static fn (CsvRowError $rowError): array => $rowError->toArray(),
-            $rowErrors
+            static fn (CsvRowIssue $issue): array => $issue->toArray(),
+            $rowIssues
         );
     }
 

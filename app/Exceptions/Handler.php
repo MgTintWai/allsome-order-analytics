@@ -11,9 +11,9 @@ use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Validation\ValidationException;
 
 /**
- * API JSON errors (see bootstrap/app.php). Registered after Laravel’s kernel exists.
+ * API JSON errors (see bootstrap/app.php). Registered after Laravel's kernel exists.
  *
- * PostTooLargeException: thrown when the request is within PHP’s post_max_size but the
+ * PostTooLargeException: thrown when the request is within PHP's post_max_size but the
  * Content-Length still exceeds the limit Laravel checks (ValidatePostSize). This handler
  * cannot stop raw PHP *warnings* from post_max (see public/index.php + php.ini); it only
  * shapes the 413 response once the framework can handle the request.
@@ -65,7 +65,7 @@ final class Handler
                     'no_valid_order_rows',
                     $e->getMessage(),
                     [
-                        'row_errors' => $e->rowErrors,
+                        'row_errors' => $e->rowIssues,
                     ],
                     422
                 )

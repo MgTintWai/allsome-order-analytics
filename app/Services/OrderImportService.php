@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\CsvFileReaderInterface;
-use App\DTO\CsvRowError;
+use App\DTO\CsvRowIssue;
 use App\DTO\OrderCsvLoadResult;
 use App\Exceptions\OrderCsvFileException;
 
@@ -32,22 +32,22 @@ final class OrderImportService
         if ($rawLines === []) {
             return new OrderCsvLoadResult(
                 orderLines: [],
-                rowErrors: [new CsvRowError(1, 'CSV is empty')],
+                rowIssues: [new CsvRowIssue(1, 'CSV is empty')],
             );
         }
 
         $cellRows = $this->orderCsvParser->toCellRows($rawLines);
 
-        $headerError = $this->orderHeaderValidator->validateHeaderOrError($cellRows[0] ?? []);
-        if ($headerError !== null) {
+        $headerIssue = $this->orderHeaderValidator->validateHeaderOrIssue($cellRows[0] ?? []);
+        if ($headerIssue !== null) {
             return new OrderCsvLoadResult(
                 orderLines: [],
-                rowErrors: [$headerError],
+                rowIssues: [$headerIssue],
             );
         }
 
         $orderLines = [];
-        $rowErrors = [];
+        $rowIssues = [];
         for ($i = 1, $lineCount = count($rawLines); $i < $lineCount; $i++) {
             $lineNumber = $i + 1;
             if (trim($rawLines[$i]) === '') {
@@ -59,15 +59,15 @@ final class OrderImportService
                 continue;
             }
 
-            $outcome = $this->orderRowValidator->validateDataRowOrError($row, $lineNumber);
-            if ($outcome instanceof CsvRowError) {
-                $rowErrors[] = $outcome;
+            $outcome = $this->orderRowValidator->validateDataRowOrIssue($row, $lineNumber);
+            if ($outcome instanceof CsvRowIssue) {
+                $rowIssues[] = $outcome;
             } else {
                 $orderLines[] = $outcome;
             }
         }
 
-        return new OrderCsvLoadResult($orderLines, $rowErrors);
+        return new OrderCsvLoadResult($orderLines, $rowIssues);
     }
 
     /**

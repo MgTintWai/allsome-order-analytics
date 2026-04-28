@@ -15,7 +15,7 @@ interface OrderCsvRepositoryInterface
 {
     /**
      * Read and parse the file at the given path. Malformed data rows are collected in
-     * {@see OrderCsvLoadResult::rowErrors}; only transport-level failures use exceptions.
+     * {@see OrderCsvLoadResult::rowIssues}; only transport-level failures use exceptions.
      *
      * @throws OrderCsvFileException When the path is not a readable file, or cannot be read.
      */

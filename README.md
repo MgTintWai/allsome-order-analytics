@@ -140,7 +140,7 @@ composer test
 - `app/Services/OrderImportService.php` — orchestrates import → `OrderCsvLoadResult`
 - `app/Repositories/OrderCsvRepository.php` — thin adapter to `OrderImportService`
 - `app/Services/OrderAnalyticsService.php` — calls repository, revenue + best SKU
-- `app/DTO/` — `OrderLine`, `CsvRowError`, `OrderCsvLoadResult` (data transfer for CSV → analytics)
+- `app/DTO/` — `OrderLine`, `CsvRowIssue`, `OrderCsvLoadResult` (`rowIssues` / transport for CSV → analytics)
 - `app/Http/Controllers/Api/OrderAnalyticsController.php` — upload endpoint
 - `app/Http/Requests/OrderAnalyticsUploadRequest.php` — composes `OrderCsvFile` + `OrderCsvRequestBodyHeuristic`, `failedValidation` envelope
 - `app/Support/OrderUploadConstraints.php` — max upload size, CSV column count, JSON decimals, `Content-Length` tolerance helper
