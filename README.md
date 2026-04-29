@@ -5,7 +5,6 @@ Laravel 12 service that **accepts an orders CSV via HTTP upload** and returns **
 Design:
 
 - **API → `OrderAnalyticsService` → `OrderCsvRepository`:** the controller only talks to the service. The service calls the repository for “data access” (CSV file on disk, same role as a DB repository in a typical stack) and runs domain logic (`summarize`, tie-break) in one place.
-- `App\Contracts\BaseInterface` and `App\Repositories\BaseRepository` match the same repository foundation pattern used in **translation-service** (Eloquent CRUD for future or optional persistence; this project’s order flow is CSV-based).
 - `OrderCsvRepositoryInterface` → `OrderCsvRepository` implements CSV loading; `OrderAnalyticsService` orchestrates load + analytics.
 - **Validation:** `OrderUploadConstraints` holds 4 MB caps, allowed CSV MIME list, and `Content-Length` tuning. **`OrderCsvFile`** enforces exactly one part, **`.csv` only** (client extension and `guessExtension()`), **declared MIME** in an allow-list (extension can be spoofed; MIME can be wrong for renamed binaries—both checks help), and max size. **`OrderCsvRequestBodyHeuristic`** catches Postman adding a second file under the same key when PHP only keeps one part: the **full request body** still includes both parts, so `Content-Length` can exceed the visible file + tolerance.
 
